@@ -1,0 +1,27 @@
+{
+    "manifest_version": 3,
+    "name": "Nano Banana Gemini Automator",
+    "version": "1.0",
+    "description": "Automates multi-angle image generation directly in the Gemini Web UI.",
+    "action": {
+      "default_popup": "index.html"
+    },
+    "permissions": [
+      "storage",
+      "activeTab",
+      "scripting",
+      "downloads"
+    ],
+    "host_permissions": [
+      "*://gemini.google.com/*"
+    ],
+    "content_scripts": [
+      {
+        "matches": ["*://gemini.google.com/*"],
+        "js": ["content.js"]
+      }
+    ],
+    "background": {
+      "service_worker": "background.js"
+    }
+  }
