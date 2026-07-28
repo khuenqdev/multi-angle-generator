@@ -1,4 +1,4 @@
-// --- DOM AUTOMATION FOR GEMINI (Smart Image Polling) ---
+// --- DOM AUTOMATION FOR GEMINI (Instant Completion on Final Prompt) ---
 
 let isRunning = false;
 let promptsQueue = [];
@@ -38,7 +38,6 @@ const simulateTyping = (element, text) => {
   document.execCommand('insertText', false, text);
 };
 
-// Helper: Safely filters and returns generated response images (ignores avatars & upload previews)
 const getGeneratedImages = () => {
   const candidates = Array.from(document.querySelectorAll('single-image img, generated-image img, .response-container img, model-response img'));
   return candidates.filter(img => {
@@ -49,7 +48,6 @@ const getGeneratedImages = () => {
   });
 };
 
-// Helper: Smart poller that waits until a NEW image is fully rendered
 const waitForGeneratedImage = async (lastSeenSrc, timeout = 120000) => {
   const start = Date.now();
   while (Date.now() - start < timeout) {
@@ -58,8 +56,6 @@ const waitForGeneratedImage = async (lastSeenSrc, timeout = 120000) => {
     const currentImages = getGeneratedImages();
     if (currentImages.length > 0) {
       const latestImg = currentImages[currentImages.length - 1];
-      
-      // Check if it's a new image and that it has finished loading in browser memory
       if (latestImg && latestImg.src && latestImg.src !== lastSeenSrc) {
         if (latestImg.complete && latestImg.naturalWidth > 0) {
           return latestImg;
@@ -76,6 +72,7 @@ const startTask = async () => {
     for (currentIdx = 0; currentIdx < promptsQueue.length; currentIdx++) {
       if (!isRunning) break;
       
+      const isLastPrompt = (currentIdx === promptsQueue.length - 1);
       const rawPrompt = promptsQueue[currentIdx];
       const match = rawPrompt.match(/^\[(.*?)\]\s*(.*)$/);
       const label = match ? match[1].trim() : `Image_${Date.now()}`;
@@ -83,12 +80,11 @@ const startTask = async () => {
 
       console.log(`[Automator] Executing step ${currentIdx + 1}/${promptsQueue.length}: ${label}`);
 
-      // Capture the current last image src before submitting new prompt
       const existingImages = getGeneratedImages();
       const lastSeenSrc = existingImages.length > 0 ? existingImages[existingImages.length - 1].src : null;
 
       if (currentIdx === 0) {
-        // STEP 1: Type in main box and send
+        // First Prompt
         const chatBox = await waitForElement('rich-textarea div[contenteditable="true"]');
         simulateTyping(chatBox, text);
         await sleep(1000);
@@ -102,7 +98,7 @@ const startTask = async () => {
         
         sendBtn.click();
       } else {
-        // STEP 1 (Loop): Edit the previous prompt
+        // Edit Prompt Loop
         let latestEditBtn = null;
         for (let i = 0; i < 10; i++) {
           const editBtns = Array.from(document.querySelectorAll('button')).filter(btn => {
@@ -134,11 +130,11 @@ const startTask = async () => {
         }
       }
 
-      // STEP 2: Actively Poll for the Generated Image
+      // Wait for Image Generation
       console.log("[Automator] Waiting for Gemini image generation to complete...");
-      const generatedImg = await waitForGeneratedImage(lastSeenSrc, 120000); // 2 min max wait
+      const generatedImg = await waitForGeneratedImage(lastSeenSrc, 120000);
       
-      // STEP 3: Download the Image
+      // Download Image
       if (generatedImg) {
         const safeLabel = label.replace(/[^a-z0-9]/gi, '_').toLowerCase();
         chrome.runtime.sendMessage({
@@ -151,13 +147,18 @@ const startTask = async () => {
         console.warn(`[Automator] Timed out waiting for image: ${label}`);
       }
 
-      // STEP 4: 20-Second Cooldown before next prompt
-      if (currentIdx < promptsQueue.length - 1) {
-        console.log("[Automator] Cooldown: Waiting 20 seconds before the next prompt...");
-        for (let s = 0; s < 20; s++) {
-          if (!isRunning) break;
-          await sleep(1000);
-        }
+      // 🛑 STOP IMMEDIATELY IF THIS WAS THE LAST PROMPT
+      if (isLastPrompt) {
+        console.log("%c[Automator] 🎉 ALL PROMPTS COMPLETED SUCCESSFULLY!", "color: #3b82f6; font-weight: bold; font-size: 14px;");
+        alert("🎉 All multi-angle images have been generated and downloaded!");
+        break; // Exit loop immediately, skipping 20s cooldown!
+      }
+
+      // Cooldown ONLY for intermediate prompts
+      console.log("[Automator] Cooldown: Waiting 20 seconds before the next prompt...");
+      for (let s = 0; s < 20; s++) {
+        if (!isRunning) break;
+        await sleep(1000);
       }
     }
   } catch (err) {
@@ -165,5 +166,7 @@ const startTask = async () => {
     alert("Automator stopped: " + err.message + "\n\nSee console (F12) for details.");
   } finally {
     isRunning = false;
+    // Send message to extension popup to flip button back to "Start Automation"
+    chrome.runtime.sendMessage({ action: "AUTOMATION_FINISHED" });
   }
 };

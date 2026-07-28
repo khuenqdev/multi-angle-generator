@@ -6,7 +6,6 @@ export default function App() {
   const [newPrompt, setNewPrompt] = useState("");
   const [isRunning, setIsRunning] = useState(false);
 
-  // Load prompts from Chrome Storage on popup open
   useEffect(() => {
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.get(['savedPrompts'], (result) => {
@@ -17,11 +16,27 @@ export default function App() {
         }
       });
     } else {
-      setPrompts(initialPromptsData); // Fallback for local testing
+      setPrompts(initialPromptsData);
     }
+
+    // Listen for completion signal from content.js
+    const listener = (msg) => {
+      if (msg.action === "AUTOMATION_FINISHED") {
+        setIsRunning(false);
+      }
+    };
+
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.onMessage.addListener(listener);
+    }
+
+    return () => {
+      if (typeof chrome !== 'undefined' && chrome.runtime) {
+        chrome.runtime.onMessage.removeListener(listener);
+      }
+    };
   }, []);
 
-  // Save prompts to Chrome Storage whenever they change
   const savePrompts = (updatedPrompts) => {
     setPrompts(updatedPrompts);
     if (typeof chrome !== 'undefined' && chrome.storage) {
@@ -50,7 +65,6 @@ export default function App() {
     if (prompts.length === 0) return alert("Add at least one prompt!");
     setIsRunning(true);
     
-    // Send message to the active Gemini Tab
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const activeTab = tabs[0];
       if (activeTab.url.includes("gemini.google.com")) {
@@ -75,7 +89,6 @@ export default function App() {
   };
 
   return (
-    // Restricted width/height because it's now a Chrome Extension Popup
     <div className="w-[450px] min-h-[500px] max-h-[600px] overflow-y-auto bg-gray-50 p-4 font-sans flex flex-col">
       <h1 className="text-xl font-bold text-gray-800 mb-1">Nano Banana Automator</h1>
       <p className="text-xs text-gray-500 mb-4">
@@ -106,7 +119,7 @@ export default function App() {
           <div className="flex gap-2 mt-4 pt-2 border-t">
             <input 
               type="text"
-              className="border border-gray-300 rounded px-2 py-1 flex-1 text-xs" 
+              className="border border-gray-300 rounded px-2 py-1 text-xs flex-1" 
               placeholder="[Label] Prompt text..."
               value={newPrompt} 
               onChange={(e) => setNewPrompt(e.target.value)} 
