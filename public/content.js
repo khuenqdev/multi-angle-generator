@@ -52,7 +52,7 @@ const waitForGeneratedImage = async (lastSeenSrc, timeout = 120000) => {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     if (!isRunning) return null;
-    
+
     const currentImages = getGeneratedImages();
     if (currentImages.length > 0) {
       const latestImg = currentImages[currentImages.length - 1];
@@ -71,7 +71,7 @@ const startTask = async () => {
   try {
     for (currentIdx = 0; currentIdx < promptsQueue.length; currentIdx++) {
       if (!isRunning) break;
-      
+
       const isLastPrompt = (currentIdx === promptsQueue.length - 1);
       const rawPrompt = promptsQueue[currentIdx];
       const match = rawPrompt.match(/^\[(.*?)\]\s*(.*)$/);
@@ -88,14 +88,14 @@ const startTask = async () => {
         const chatBox = await waitForElement('rich-textarea div[contenteditable="true"]');
         simulateTyping(chatBox, text);
         await sleep(1000);
-        
-        const sendBtns = Array.from(document.querySelectorAll('button')).filter(btn => 
+
+        const sendBtns = Array.from(document.querySelectorAll('button')).filter(btn =>
           btn.querySelector('mat-icon[data-mat-icon-name="arrow_upward"], mat-icon[fonticon="arrow_upward"]') ||
           btn.closest('[data-test-id="send-button-container"]')
         );
         const sendBtn = sendBtns[sendBtns.length - 1];
         if (!sendBtn || sendBtn.disabled) throw new Error("Could not find active Send button.");
-        
+
         sendBtn.click();
       } else {
         // Edit Prompt Loop
@@ -108,20 +108,20 @@ const startTask = async () => {
           if (latestEditBtn) break;
           await sleep(500);
         }
-        
+
         if (!latestEditBtn) throw new Error("Could not find the Edit button.");
         latestEditBtn.click();
-        
+
         console.log("[Automator] Waiting for Edit Text area...");
         const editBox = await waitForElement('.edit-mode textarea', 10000);
-        
+
         editBox.focus();
         editBox.value = text;
         editBox.dispatchEvent(new Event('input', { bubbles: true }));
         editBox.dispatchEvent(new Event('change', { bubbles: true }));
-        
+
         await sleep(500);
-        
+
         const updateBtn = await waitForElement('.update-button, button.update-button', 5000);
         if (updateBtn) {
           updateBtn.click();
@@ -133,7 +133,7 @@ const startTask = async () => {
       // Wait for Image Generation
       console.log("[Automator] Waiting for Gemini image generation to complete...");
       const generatedImg = await waitForGeneratedImage(lastSeenSrc, 120000);
-      
+
       // Download Image
       if (generatedImg) {
         const safeLabel = label.replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -155,8 +155,8 @@ const startTask = async () => {
       }
 
       // Cooldown ONLY for intermediate prompts
-      console.log("[Automator] Cooldown: Waiting 20 seconds before the next prompt...");
-      for (let s = 0; s < 20; s++) {
+      console.log("[Automator] Cooldown: Waiting 3 seconds before the next prompt...");
+      for (let s = 0; s < 3; s++) {
         if (!isRunning) break;
         await sleep(1000);
       }
