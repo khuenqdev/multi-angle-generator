@@ -155,8 +155,8 @@ const startTask = async () => {
       }
 
       // Cooldown ONLY for intermediate prompts
-      console.log("[Automator] Cooldown: Waiting 3 seconds before the next prompt...");
-      for (let s = 0; s < 3; s++) {
+      console.log("[Automator] Cooldown: Waiting 10 seconds before the next prompt...");
+      for (let s = 0; s < 10; s++) {
         if (!isRunning) break;
         await sleep(1000);
       }
